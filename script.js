@@ -46,7 +46,12 @@ async function getWeather() {
         
         displayWeather(weatherData, name, country);
     } catch (error) {
-        weatherInfo.innerHTML = `<p>${error.message}</p>`;
+        cityNameElement.textContent = 'City Not Found';
+        temperatureElement.textContent = '--°C';
+        weatherDescriptionElement.textContent = error.message;
+        humidityElement.textContent = '--%';
+        windSpeedElement.textContent = '-- km/h';
+        weatherIconElement.className = 'wi wi-na';
     }
 }
 

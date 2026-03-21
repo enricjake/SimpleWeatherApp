@@ -8,13 +8,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.12/css/weather-icons.min.css">
 </head>
 <body>
-    <div class="container">
+    <div class="container" role="main">
         <h1>Weather Forecast</h1>
         <div class="search-box">
-            <input type="text" id="city-input" placeholder="Enter city name...">
-            <button id="search-btn">Get Weather</button>
+            <input type="text" id="city-input" placeholder="Enter city name..." aria-label="Enter city name">
+            <button id="search-btn" aria-label="Get weather for city">Get Weather</button>
         </div>
-        <div id="weather-info" class="weather-info">
+        <button id="theme-toggle" aria-label="Toggle dark mode"><i class="wi wi-moon"></i></button>
+        <button id="location-btn" aria-label="Use my location">Use My Location</button>
+        <div id="weather-info" class="weather-info" role="status">
+            <div id="loading" class="loading-spinner" aria-hidden="true"></div>
             <i class="wi wi-day-sunny weather-icon"></i>
             <h2 id="city-name">City Name</h2>
             <p id="temperature">--°C</p>

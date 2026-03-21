@@ -1,8 +1,13 @@
 const apiKey = ''; // Open-Meteo doesn't require an API key
 const apiUrl = 'https://api.open-meteo.com/v1/forecast';
 
+// Geocoding API to convert city name to coordinates
+const geocodingUrl = 'https://geocoding-api.open-meteo.com/v1/search';
+
 const cityInput = document.getElementById('city-input');
 const searchBtn = document.getElementById('search-btn');
+const locationBtn = document.getElementById('location-btn');
+const themeToggle = document.getElementById('theme-toggle');
 const weatherInfo = document.getElementById('weather-info');
 const cityNameElement = document.getElementById('city-name');
 const temperatureElement = document.getElementById('temperature');
@@ -10,9 +15,7 @@ const weatherDescriptionElement = document.getElementById('weather-description')
 const humidityElement = document.getElementById('humidity');
 const windSpeedElement = document.getElementById('wind-speed');
 const weatherIconElement = document.querySelector('.weather-icon');
-
-// Geocoding API to convert city name to coordinates
-const geocodingUrl = 'https://geocoding-api.open-meteo.com/v1/search';
+const loadingDiv = document.getElementById('loading');
 
 searchBtn.addEventListener('click', getWeather);
 cityInput.addEventListener('keypress', function(e) {
@@ -21,37 +24,78 @@ cityInput.addEventListener('keypress', function(e) {
     }
 });
 
+locationBtn.addEventListener('click', getWeatherByLocation);
+themeToggle.addEventListener('click', toggleDarkMode);
+
 async function getWeather() {
     const city = cityInput.value.trim();
-    
+
     if (city === '') {
-        weatherInfo.innerHTML = '<p>Please enter a city name</p>';
+        showError('Please enter a city name');
         return;
     }
-    
+
+    // Show spinner
+    loadingDiv.hidden = false;
+    weatherInfo.classList.add('dimmed');
+
     try {
         // First, get the coordinates for the city
         const geoResponse = await fetch(`${geocodingUrl}?name=${city}&count=1&language=en&format=json`);
         const geoData = await geoResponse.json();
-        
+
         if (!geoData.results || geoData.results.length === 0) {
             throw new Error('City not found');
         }
-        
+
         const { latitude, longitude, name, country } = geoData.results[0];
-        
+
         // Then, get the weather data using the coordinates
         const weatherResponse = await fetch(`${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`);
         const weatherData = await weatherResponse.json();
-        
+
         displayWeather(weatherData, name, country);
     } catch (error) {
-        cityNameElement.textContent = 'City Not Found';
-        temperatureElement.textContent = '--°C';
-        weatherDescriptionElement.textContent = error.message;
-        humidityElement.textContent = '--%';
-        windSpeedElement.textContent = '-- km/h';
-        weatherIconElement.className = 'wi wi-na';
+        showError(error.message);
+    } finally {
+        loadingDiv.hidden = true;
+        weatherInfo.classList.remove('dimmed');
+    }
+}
+
+async function getWeatherByLocation() {
+    if (!navigator.geolocation) {
+        showError('Geolocation is not supported by your browser');
+        return;
+    }
+
+    // Show spinner
+    loadingDiv.hidden = false;
+    weatherInfo.classList.add('dimmed');
+
+    try {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+
+            // Get the weather data using the coordinates
+            const weatherResponse = await fetch(`${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`);
+            const weatherData = await weatherResponse.json();
+
+            // Get the city name from the reverse geocoding API
+            const reverseGeoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=en&format=json`);
+            const reverseGeoData = await reverseGeoResponse.json();
+
+            const { name, country } = reverseGeoData.results[0];
+
+            displayWeather(weatherData, name, country);
+        }, (error) => {
+            showError('Unable to retrieve your location');
+        });
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        loadingDiv.hidden = true;
+        weatherInfo.classList.remove('dimmed');
     }
 }
 
@@ -73,7 +117,6 @@ function displayWeather(data, cityName, country) {
     weatherIconElement.className = `wi ${weatherDetails.icon}`;
 }
 
-// Function to convert weather code to description and icon class
 function getWeatherInfo(weatherCode) {
     const weatherMap = {
         // Weather codes from Open-Meteo API
@@ -115,4 +158,17 @@ function getWeatherInfo(weatherCode) {
     };
 
     return weatherMap[weatherCode] || { description: 'Unknown', icon: 'wi-na' };
+}
+
+function showError(message) {
+    cityNameElement.textContent = 'Error';
+    temperatureElement.textContent = '--°C';
+    weatherDescriptionElement.textContent = message;
+    humidityElement.textContent = '--%';
+    windSpeedElement.textContent = '-- km/h';
+    weatherIconElement.className = 'wi wi-alert';
+}
+
+function toggleDarkMode() {
+    document.body.classList.toggle('dark');
 }

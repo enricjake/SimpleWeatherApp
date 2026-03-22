@@ -65,15 +65,17 @@ document.addEventListener('click', function(e) {
 });
 
 locationBtn.addEventListener('click', function() {
-    console.log('Location button clicked');
+    // Show loading state when button is clicked
+    loadingDiv.hidden = false;
+    weatherInfo.classList.add('dimmed');
     getWeatherByLocation();
 });
 themeToggle.addEventListener('click', toggleDarkMode);
 
 async function fetchCitySuggestions(query) {
     try {
-        // Fetch more results to show multiple cities with same name
-        const response = await fetch(`${geocodingUrl}?name=${query}&count=10&language=en&format=json`);
+        // Fetch more results to have a better pool to choose from
+        const response = await fetch(`${geocodingUrl}?name=${query}&count=20&language=en&format=json`);
         if (!response.ok) {
             throw new Error(`Geocoding API error: ${response.status}`);
         }
@@ -93,17 +95,42 @@ async function fetchCitySuggestions(query) {
 function displaySuggestions(results) {
     suggestionsDiv.innerHTML = '';
     
-    // Group cities by name to show duplicates together
-    const cityGroups = {};
-    results.forEach(city => {
-        const key = city.name.toLowerCase();
-        if (!cityGroups[key]) {
-            cityGroups[key] = [];
-        }
-        cityGroups[key].push(city);
-    });
+    // Deduplicate cities: keep only unique city+region+country combinations
+    // This prevents showing the same location multiple times
+    const seenLocations = new Set();
+    const uniqueResults = [];
     
     results.forEach(city => {
+        // Create a unique key based on name, admin1, and country
+        const key = `${city.name.toLowerCase()}-${(city.admin1 || '').toLowerCase()}-${(city.country || '').toLowerCase()}`;
+        
+        if (!seenLocations.has(key)) {
+            seenLocations.add(key);
+            uniqueResults.push(city);
+        }
+    });
+    
+    // Sort by relevance: exact name matches first, then more specific locations (with admin1 and country)
+    const query = cityInput.value.toLowerCase().trim();
+    uniqueResults.sort((a, b) => {
+        const aExact = a.name.toLowerCase() === query;
+        const bExact = b.name.toLowerCase() === query;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        
+        // Secondary sort: prefer entries with both admin1 and country (more specific)
+        const aSpecific = a.admin1 && a.country;
+        const bSpecific = b.admin1 && b.country;
+        if (aSpecific && !bSpecific) return -1;
+        if (!aSpecific && bSpecific) return 1;
+        
+        return 0;
+    });
+    
+    // Limit to top 8 suggestions
+    const topSuggestions = uniqueResults.slice(0, 8);
+    
+    topSuggestions.forEach(city => {
         const suggestionItem = document.createElement('div');
         suggestionItem.className = 'suggestion-item';
         
@@ -253,96 +280,63 @@ async function getWeatherBySelectedLocation() {
     }
 }
 
-function getWeatherByLocation() {
-    if (!navigator.geolocation) {
-        showError('Geolocation is not supported by your browser');
-        return;
-    }
-
-    // Show spinner
+// IP-based geolocation (no browser permission required)
+async function getWeatherByLocation() {
+    // Show loading state - start with hidden spinner
     loadingDiv.hidden = false;
     weatherInfo.classList.add('dimmed');
     
-    // Show loading state
-    cityNameElement.textContent = 'Getting location...';
+    cityNameElement.textContent = 'Detecting location...';
     temperatureElement.textContent = '--°C';
-    weatherDescriptionElement.textContent = 'Please allow location access';
+    weatherDescriptionElement.textContent = 'Getting your weather data...';
     humidityElement.textContent = '--%';
     windSpeedElement.textContent = '-- km/h';
 
-    // Use getCurrentPosition with proper error handling
-    navigator.geolocation.getCurrentPosition(
-        async (position) => {
-            const { latitude, longitude } = position.coords;
-            console.log('Got position:', latitude, longitude);
-
-            try {
-                // Get the weather data using the coordinates
-                const weatherUrl = `${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
-                console.log('Fetching weather from:', weatherUrl);
-                
-                const weatherResponse = await fetch(weatherUrl);
-                if (!weatherResponse.ok) {
-                    throw new Error(`Weather API error: ${weatherResponse.status}`);
-                }
-                const weatherData = await weatherResponse.json();
-                console.log('Weather data:', weatherData);
-
-                // Get the city name from the reverse geocoding API
-                const reverseGeoUrl = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=en&format=json`;
-                console.log('Reverse geocoding from:', reverseGeoUrl);
-                
-                const reverseGeoResponse = await fetch(reverseGeoUrl);
-                if (!reverseGeoResponse.ok) {
-                    throw new Error(`Reverse geocoding API error: ${reverseGeoResponse.status}`);
-                }
-                const reverseGeoData = await reverseGeoResponse.json();
-                console.log('Reverse geocoding data:', reverseGeoData);
-
-                if (reverseGeoData.results && reverseGeoData.results.length > 0) {
-                    const { name, country } = reverseGeoData.results[0];
-                    displayWeather(weatherData, name, country);
-                } else {
-                    displayWeather(weatherData, 'Unknown Location', '');
-                }
-            } catch (error) {
-                console.error('Error in getWeatherByLocation:', error);
-                if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                    showError('Network error. Please check your internet connection and try again.');
-                } else {
-                    showError(error.message || 'Unable to get weather data');
-                }
-            } finally {
-                loadingDiv.hidden = true;
-                weatherInfo.classList.remove('dimmed');
-            }
-        },
-        (error) => {
-            console.error('Geolocation error:', error);
-            let errorMessage = 'Unable to retrieve your location';
+    try {
+        // Use ip-api.com (no API key required for non-commercial use)
+        const ipResponse = await fetch('http://ip-api.com/json/?fields=61439');
+        if (!ipResponse.ok) {
+            throw new Error('Failed to get location from IP');
+        }
+        const ipData = await ipResponse.json();
+        
+        if (ipData.status === 'success') {
+            const { lat, lon, city, regionName, country } = ipData;
             
-            switch (error.code) {
-                case error.PERMISSION_DENIED:
-                    errorMessage = 'Location permission denied. Please enable location access in your browser settings.';
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    errorMessage = 'Location information is unavailable.';
-                    break;
-                case error.TIMEOUT:
-                    errorMessage = 'Location request timed out. Please try again.';
-                    break;
+            // Get weather data using the coordinates
+            const weatherUrl = `${apiUrl}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+            const weatherResponse = await fetch(weatherUrl);
+            if (!weatherResponse.ok) {
+                throw new Error(`Weather API error: ${weatherResponse.status}`);
             }
+            const weatherData = await weatherResponse.json();
             
-            showError(errorMessage);
+            // Hide loading spinner and remove dim
             loadingDiv.hidden = true;
             weatherInfo.classList.remove('dimmed');
-        },
-        {
-            enableHighAccuracy: false, // Use network-based location (faster, works indoors)
-            timeout: 30000, // 30 seconds timeout
-            maximumAge: 600000 // Allow cached location up to 10 minutes old
+            
+            // Create display name
+            let displayName = city ? city : `${lat.toFixed(2)}°N, ${lon.toFixed(2)}°W`;
+            if (regionName) displayName += `, ${regionName}`;
+            if (country) displayName += `, ${country}`;
+            
+            displayWeather(weatherData, displayName, '');
+        } else {
+            throw new Error('Unable to determine location from IP address');
         }
-    );
+    } catch (error) {
+        console.error('Location error:', error);
+        
+        // Hide loading spinner and remove dim
+        loadingDiv.hidden = true;
+        weatherInfo.classList.remove('dimmed');
+        
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            showError('Network error. Please check your internet connection.');
+        } else {
+            showError('Unable to determine location. Please search by city name.');
+        }
+    }
 }
 
 function displayWeather(data, cityName, country) {

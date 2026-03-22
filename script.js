@@ -166,6 +166,11 @@ async function getWeather() {
     try {
         // First, get the coordinates for the city
         const geoResponse = await fetch(`${geocodingUrl}?name=${city}&count=5&language=en&format=json`);
+        
+        if (!geoResponse.ok) {
+            throw new Error(`Geocoding API error: ${geoResponse.status}`);
+        }
+        
         const geoData = await geoResponse.json();
 
         if (!geoData.results || geoData.results.length === 0) {
@@ -185,6 +190,11 @@ async function getWeather() {
 
         // Then, get the weather data using the coordinates
         const weatherResponse = await fetch(`${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`);
+        
+        if (!weatherResponse.ok) {
+            throw new Error(`Weather API error: ${weatherResponse.status}`);
+        }
+        
         const weatherData = await weatherResponse.json();
 
         displayWeather(weatherData, name, country);
@@ -192,6 +202,8 @@ async function getWeather() {
         console.error('Weather fetch error:', error);
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
             showError('Network error. Please check your internet connection and try again.');
+        } else if (error.message.includes('API error')) {
+            showError(error.message);
         } else {
             showError(error.message);
         }
@@ -218,6 +230,11 @@ async function getWeatherBySelectedLocation() {
 
         // Get the weather data using the coordinates
         const weatherResponse = await fetch(`${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`);
+        
+        if (!weatherResponse.ok) {
+            throw new Error(`Weather API error: ${weatherResponse.status}`);
+        }
+        
         const weatherData = await weatherResponse.json();
 
         displayWeather(weatherData, name, country);
@@ -225,6 +242,8 @@ async function getWeatherBySelectedLocation() {
         console.error('Weather fetch error:', error);
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
             showError('Network error. Please check your internet connection and try again.');
+        } else if (error.message.includes('API error')) {
+            showError(error.message);
         } else {
             showError(error.message);
         }

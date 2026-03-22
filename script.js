@@ -294,14 +294,18 @@ async function getWeatherByLocation() {
 
     try {
         // Use ip-api.com (no API key required for non-commercial use)
-        const ipResponse = await fetch('https://ip-api.com/json/?fields=61439', { mode: 'cors' });
+        const ipResponse = await fetch('https://ipinfo.io/json', { mode: 'cors' });
         if (!ipResponse.ok) {
             throw new Error('Failed to get location from IP');
         }
         const ipData = await ipResponse.json();
         
-        if (ipData.status === 'success') {
-            const { lat, lon, city, regionName, country } = ipData;
+        // ipinfo.io returns 'loc' as 'latitude,longitude' and 'region' instead of 'regionName'
+        if (ipData.loc) { // ipinfo.io indicates success by returning location data
+            const [lat, lon] = ipData.loc.split(',');
+            const city = ipData.city;
+            const regionName = ipData.region;
+            const country = ipData.country;
             
             // Get weather data using the coordinates
             const weatherUrl = `${apiUrl}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;

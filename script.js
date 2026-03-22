@@ -294,7 +294,7 @@ async function getWeatherByLocation() {
 
     try {
         // Use ip-api.com (no API key required for non-commercial use)
-        const ipResponse = await fetch('http://ip-api.com/json/?fields=61439');
+        const ipResponse = await fetch('http://ip-api.com/json/?fields=61439', { mode: 'cors' });
         if (!ipResponse.ok) {
             throw new Error('Failed to get location from IP');
         }

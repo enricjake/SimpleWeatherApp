@@ -16,16 +16,93 @@ const humidityElement = document.getElementById('humidity');
 const windSpeedElement = document.getElementById('wind-speed');
 const weatherIconElement = document.querySelector('.weather-icon');
 const loadingDiv = document.getElementById('loading');
+const suggestionsDiv = document.getElementById('suggestions');
+
+// Debounce timer for autocomplete
+let debounceTimer;
 
 searchBtn.addEventListener('click', getWeather);
 cityInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
+        hideSuggestions();
         getWeather();
     }
 });
 
-locationBtn.addEventListener('click', getWeatherByLocation);
+// Autocomplete functionality
+cityInput.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    const query = this.value.trim();
+    
+    if (query.length < 2) {
+        hideSuggestions();
+        return;
+    }
+    
+    debounceTimer = setTimeout(() => {
+        fetchCitySuggestions(query);
+    }, 300);
+});
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.input-wrapper')) {
+        hideSuggestions();
+    }
+});
+
+locationBtn.addEventListener('click', function() {
+    console.log('Location button clicked');
+    getWeatherByLocation();
+});
 themeToggle.addEventListener('click', toggleDarkMode);
+
+async function fetchCitySuggestions(query) {
+    try {
+        const response = await fetch(`${geocodingUrl}?name=${query}&count=5&language=en&format=json`);
+        if (!response.ok) {
+            throw new Error(`Geocoding API error: ${response.status}`);
+        }
+        const data = await response.json();
+        
+        if (data.results && data.results.length > 0) {
+            displaySuggestions(data.results);
+        } else {
+            hideSuggestions();
+        }
+    } catch (error) {
+        console.error('Error fetching city suggestions:', error);
+        hideSuggestions();
+    }
+}
+
+function displaySuggestions(results) {
+    suggestionsDiv.innerHTML = '';
+    
+    results.forEach(city => {
+        const suggestionItem = document.createElement('div');
+        suggestionItem.className = 'suggestion-item';
+        suggestionItem.innerHTML = `
+            <span class="city-name">${city.name}</span>
+            <span class="country">${city.country || ''}</span>
+        `;
+        
+        suggestionItem.addEventListener('click', () => {
+            cityInput.value = city.name;
+            hideSuggestions();
+            getWeather();
+        });
+        
+        suggestionsDiv.appendChild(suggestionItem);
+    });
+    
+    suggestionsDiv.classList.add('active');
+}
+
+function hideSuggestions() {
+    suggestionsDiv.classList.remove('active');
+    suggestionsDiv.innerHTML = '';
+}
 
 async function getWeather() {
     const city = cityInput.value.trim();
@@ -38,6 +115,7 @@ async function getWeather() {
     // Show spinner
     loadingDiv.hidden = false;
     weatherInfo.classList.add('dimmed');
+    hideSuggestions();
 
     try {
         // First, get the coordinates for the city
@@ -56,14 +134,19 @@ async function getWeather() {
 
         displayWeather(weatherData, name, country);
     } catch (error) {
-        showError(error.message);
+        console.error('Weather fetch error:', error);
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            showError('Network error. Please check your internet connection and try again.');
+        } else {
+            showError(error.message);
+        }
     } finally {
         loadingDiv.hidden = true;
         weatherInfo.classList.remove('dimmed');
     }
 }
 
-async function getWeatherByLocation() {
+function getWeatherByLocation() {
     if (!navigator.geolocation) {
         showError('Geolocation is not supported by your browser');
         return;
@@ -72,31 +155,87 @@ async function getWeatherByLocation() {
     // Show spinner
     loadingDiv.hidden = false;
     weatherInfo.classList.add('dimmed');
+    
+    // Show loading state
+    cityNameElement.textContent = 'Getting location...';
+    temperatureElement.textContent = '--°C';
+    weatherDescriptionElement.textContent = 'Please allow location access';
+    humidityElement.textContent = '--%';
+    windSpeedElement.textContent = '-- km/h';
 
-    try {
-        navigator.geolocation.getCurrentPosition(async (position) => {
+    // Use getCurrentPosition with proper error handling
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
             const { latitude, longitude } = position.coords;
+            console.log('Got position:', latitude, longitude);
 
-            // Get the weather data using the coordinates
-            const weatherResponse = await fetch(`${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`);
-            const weatherData = await weatherResponse.json();
+            try {
+                // Get the weather data using the coordinates
+                const weatherUrl = `${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+                console.log('Fetching weather from:', weatherUrl);
+                
+                const weatherResponse = await fetch(weatherUrl);
+                if (!weatherResponse.ok) {
+                    throw new Error(`Weather API error: ${weatherResponse.status}`);
+                }
+                const weatherData = await weatherResponse.json();
+                console.log('Weather data:', weatherData);
 
-            // Get the city name from the reverse geocoding API
-            const reverseGeoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=en&format=json`);
-            const reverseGeoData = await reverseGeoResponse.json();
+                // Get the city name from the reverse geocoding API
+                const reverseGeoUrl = `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${latitude}&longitude=${longitude}&language=en&format=json`;
+                console.log('Reverse geocoding from:', reverseGeoUrl);
+                
+                const reverseGeoResponse = await fetch(reverseGeoUrl);
+                if (!reverseGeoResponse.ok) {
+                    throw new Error(`Reverse geocoding API error: ${reverseGeoResponse.status}`);
+                }
+                const reverseGeoData = await reverseGeoResponse.json();
+                console.log('Reverse geocoding data:', reverseGeoData);
 
-            const { name, country } = reverseGeoData.results[0];
-
-            displayWeather(weatherData, name, country);
-        }, (error) => {
-            showError('Unable to retrieve your location');
-        });
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        loadingDiv.hidden = true;
-        weatherInfo.classList.remove('dimmed');
-    }
+                if (reverseGeoData.results && reverseGeoData.results.length > 0) {
+                    const { name, country } = reverseGeoData.results[0];
+                    displayWeather(weatherData, name, country);
+                } else {
+                    displayWeather(weatherData, 'Unknown Location', '');
+                }
+            } catch (error) {
+                console.error('Error in getWeatherByLocation:', error);
+                if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    showError('Network error. Please check your internet connection and try again.');
+                } else {
+                    showError(error.message || 'Unable to get weather data');
+                }
+            } finally {
+                loadingDiv.hidden = true;
+                weatherInfo.classList.remove('dimmed');
+            }
+        },
+        (error) => {
+            console.error('Geolocation error:', error);
+            let errorMessage = 'Unable to retrieve your location';
+            
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = 'Location permission denied. Please enable location access in your browser settings.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = 'Location information is unavailable.';
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = 'Location request timed out. Please try again.';
+                    break;
+            }
+            
+            showError(errorMessage);
+            loadingDiv.hidden = true;
+            weatherInfo.classList.remove('dimmed');
+        },
+        {
+            enableHighAccuracy: false, // Use network-based location (faster, works indoors)
+            timeout: 30000, // 30 seconds timeout
+            maximumAge: 600000 // Allow cached location up to 10 minutes old
+        }
+    );
 }
 
 function displayWeather(data, cityName, country) {
@@ -107,7 +246,7 @@ function displayWeather(data, cityName, country) {
     const weatherDetails = getWeatherInfo(weatherCode);
 
     // Update the UI elements
-    cityNameElement.textContent = `${cityName}, ${country}`;
+    cityNameElement.textContent = country ? `${cityName}, ${country}` : cityName;
     temperatureElement.textContent = `${Math.round(temp)}°C`;
     weatherDescriptionElement.textContent = weatherDetails.description;
     humidityElement.textContent = `${humidity}%`;
@@ -171,4 +310,12 @@ function showError(message) {
 
 function toggleDarkMode() {
     document.body.classList.toggle('dark');
+    
+    // Update the icon based on current mode
+    const icon = themeToggle.querySelector('i');
+    if (document.body.classList.contains('dark')) {
+        icon.className = 'wi wi-sun';
+    } else {
+        icon.className = 'wi wi-moon-alt';
+    }
 }

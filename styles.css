@@ -179,13 +179,15 @@ body.dark .suggestion-item .city-name {
     color: var(--light-text);
 }
 
-.suggestion-item .country {
+.suggestion-item .country,
+.suggestion-item .location-detail {
     font-size: 12px;
     color: #666;
     margin-left: 5px;
 }
 
-body.dark .suggestion-item .country {
+body.dark .suggestion-item .country,
+body.dark .suggestion-item .location-detail {
     color: #aaa;
 }
 

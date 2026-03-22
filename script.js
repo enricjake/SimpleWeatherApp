@@ -25,14 +25,27 @@ searchBtn.addEventListener('click', getWeather);
 cityInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         hideSuggestions();
-        getWeather();
+        // If we have a selected location, use it directly
+        if (selectedLocation) {
+            getWeatherBySelectedLocation();
+        } else {
+            getWeather();
+        }
     }
 });
+
+// Store selected location data to avoid re-fetching
+let selectedLocation = null;
 
 // Autocomplete functionality
 cityInput.addEventListener('input', function() {
     clearTimeout(debounceTimer);
     const query = this.value.trim();
+    
+    // Clear selected location if user is typing a new query
+    if (selectedLocation && query !== selectedLocation.displayName) {
+        selectedLocation = null;
+    }
     
     if (query.length < 2) {
         hideSuggestions();
@@ -59,7 +72,8 @@ themeToggle.addEventListener('click', toggleDarkMode);
 
 async function fetchCitySuggestions(query) {
     try {
-        const response = await fetch(`${geocodingUrl}?name=${query}&count=5&language=en&format=json`);
+        // Fetch more results to show multiple cities with same name
+        const response = await fetch(`${geocodingUrl}?name=${query}&count=10&language=en&format=json`);
         if (!response.ok) {
             throw new Error(`Geocoding API error: ${response.status}`);
         }
@@ -79,18 +93,50 @@ async function fetchCitySuggestions(query) {
 function displaySuggestions(results) {
     suggestionsDiv.innerHTML = '';
     
+    // Group cities by name to show duplicates together
+    const cityGroups = {};
+    results.forEach(city => {
+        const key = city.name.toLowerCase();
+        if (!cityGroups[key]) {
+            cityGroups[key] = [];
+        }
+        cityGroups[key].push(city);
+    });
+    
     results.forEach(city => {
         const suggestionItem = document.createElement('div');
         suggestionItem.className = 'suggestion-item';
+        
+        // Build location string with more context (country, admin1/state)
+        let locationParts = [city.name];
+        if (city.admin1) {
+            locationParts.push(city.admin1); // State/Province
+        }
+        if (city.country) {
+            locationParts.push(city.country);
+        }
+        
+        const displayName = locationParts.join(', ');
+        const fullName = city.country ? `${city.name}, ${city.country}` : city.name;
+        
         suggestionItem.innerHTML = `
             <span class="city-name">${city.name}</span>
-            <span class="country">${city.country || ''}</span>
+            <span class="location-detail">${city.admin1 ? city.admin1 + ', ' : ''}${city.country || ''}</span>
         `;
         
         suggestionItem.addEventListener('click', () => {
-            cityInput.value = city.name;
+            // Store the full location data for later use
+            selectedLocation = {
+                latitude: city.latitude,
+                longitude: city.longitude,
+                name: city.name,
+                country: city.country,
+                admin1: city.admin1,
+                displayName: fullName
+            };
+            cityInput.value = displayName;
             hideSuggestions();
-            getWeather();
+            getWeatherBySelectedLocation();
         });
         
         suggestionsDiv.appendChild(suggestionItem);
@@ -119,16 +165,58 @@ async function getWeather() {
 
     try {
         // First, get the coordinates for the city
-        const geoResponse = await fetch(`${geocodingUrl}?name=${city}&count=1&language=en&format=json`);
+        const geoResponse = await fetch(`${geocodingUrl}?name=${city}&count=5&language=en&format=json`);
         const geoData = await geoResponse.json();
 
         if (!geoData.results || geoData.results.length === 0) {
             throw new Error('City not found');
         }
 
+        // If multiple results, show suggestions for user to choose
+        if (geoData.results.length > 1) {
+            loadingDiv.hidden = true;
+            weatherInfo.classList.remove('dimmed');
+            displaySuggestions(geoData.results);
+            showError('Please select a location from the suggestions');
+            return;
+        }
+
         const { latitude, longitude, name, country } = geoData.results[0];
 
         // Then, get the weather data using the coordinates
+        const weatherResponse = await fetch(`${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`);
+        const weatherData = await weatherResponse.json();
+
+        displayWeather(weatherData, name, country);
+    } catch (error) {
+        console.error('Weather fetch error:', error);
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            showError('Network error. Please check your internet connection and try again.');
+        } else {
+            showError(error.message);
+        }
+    } finally {
+        loadingDiv.hidden = true;
+        weatherInfo.classList.remove('dimmed');
+    }
+}
+
+// Get weather using pre-selected location from suggestions
+async function getWeatherBySelectedLocation() {
+    if (!selectedLocation) {
+        showError('Please select a location from the suggestions');
+        return;
+    }
+
+    // Show spinner
+    loadingDiv.hidden = false;
+    weatherInfo.classList.add('dimmed');
+    hideSuggestions();
+
+    try {
+        const { latitude, longitude, name, country } = selectedLocation;
+
+        // Get the weather data using the coordinates
         const weatherResponse = await fetch(`${apiUrl}?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`);
         const weatherData = await weatherResponse.json();
 

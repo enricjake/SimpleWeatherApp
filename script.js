@@ -5,7 +5,6 @@ const apiUrl = 'https://api.open-meteo.com/v1/forecast';
 const geocodingUrl = 'https://geocoding-api.open-meteo.com/v1/search';
 
 const cityInput = document.getElementById('city-input');
-const searchBtn = document.getElementById('search-btn');
 const locationBtn = document.getElementById('location-btn');
 const themeToggle = document.getElementById('theme-toggle');
 const weatherInfo = document.getElementById('weather-info');
@@ -14,6 +13,10 @@ const temperatureElement = document.getElementById('temperature');
 const weatherDescriptionElement = document.getElementById('weather-description');
 const humidityElement = document.getElementById('humidity');
 const windSpeedElement = document.getElementById('wind-speed');
+const maxTempElement = document.getElementById('max-temp');
+const minTempElement = document.getElementById('min-temp');
+const currentTimeElement = document.getElementById('current-time');
+const dateDisplayElement = document.getElementById('date-display');
 const weatherIconElement = document.querySelector('.weather-icon');
 const loadingDiv = document.getElementById('loading');
 const suggestionsDiv = document.getElementById('suggestions');
@@ -21,7 +24,24 @@ const suggestionsDiv = document.getElementById('suggestions');
 // Debounce timer for autocomplete
 let debounceTimer;
 
-searchBtn.addEventListener('click', getWeather);
+function checkInputOverflow() {
+    if (cityInput.scrollWidth > cityInput.clientWidth) {
+        const scrollDist = -(cityInput.scrollWidth - cityInput.clientWidth) - 10;
+        cityInput.style.setProperty('--scroll-dist', scrollDist + 'px');
+        cityInput.classList.add('overflowing');
+    } else {
+        cityInput.classList.remove('overflowing');
+        cityInput.style.removeProperty('--scroll-dist');
+    }
+}
+
+// Set current date in the header
+const dateTagline = document.getElementById('current-date');
+if (dateTagline) {
+    const now = new Date();
+    dateTagline.textContent = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 cityInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         hideSuggestions();
@@ -52,9 +72,22 @@ cityInput.addEventListener('input', function() {
         return;
     }
     
+    // Check if input text overflows and apply scroll animation
+    requestAnimationFrame(checkInputOverflow);
+    
     debounceTimer = setTimeout(() => {
         fetchCitySuggestions(query);
     }, 300);
+});
+
+// Reset scroll animation on focus, re-check on blur
+cityInput.addEventListener('focus', function() {
+    this.classList.remove('overflowing');
+    this.style.textIndent = '0';
+});
+
+cityInput.addEventListener('blur', function() {
+    requestAnimationFrame(checkInputOverflow);
 });
 
 // Hide suggestions when clicking outside
@@ -66,7 +99,7 @@ document.addEventListener('click', function(e) {
 
 locationBtn.addEventListener('click', function() {
     // Show loading state when button is clicked
-    loadingDiv.hidden = false;
+    loadingDiv.classList.add('visible');
     weatherInfo.classList.add('dimmed');
     getWeatherByLocation();
 });
@@ -74,15 +107,24 @@ themeToggle.addEventListener('click', toggleDarkMode);
 
 async function fetchCitySuggestions(query) {
     try {
-        // Fetch more results to have a better pool to choose from
-        const response = await fetch(`${geocodingUrl}?name=${query}&count=20&language=en&format=json`);
+        // Fetch a large pool of results to filter for major cities
+        const response = await fetch(`${geocodingUrl}?name=${query}&count=50&language=en&format=json`);
         if (!response.ok) {
             throw new Error(`Geocoding API error: ${response.status}`);
         }
         const data = await response.json();
         
         if (data.results && data.results.length > 0) {
-            displaySuggestions(data.results);
+            // Filter to actual populated places (cities/towns) with population data
+            const cityFeatureCodes = ['PPL', 'PPLA', 'PPLA2', 'PPLA3', 'PPLA4', 'PPLC', 'PPLG', 'PPLS'];
+            const cities = data.results.filter(city =>
+                cityFeatureCodes.includes(city.feature_code) && city.population > 0
+            );
+            if (cities.length > 0) {
+                displaySuggestions(cities);
+            } else {
+                hideSuggestions();
+            }
         } else {
             hideSuggestions();
         }
@@ -110,7 +152,7 @@ function displaySuggestions(results) {
         }
     });
     
-    // Sort by relevance: exact name matches first, then more specific locations (with admin1 and country)
+    // Sort by relevance: exact name matches first, then by population (largest first)
     const query = cityInput.value.toLowerCase().trim();
     uniqueResults.sort((a, b) => {
         const aExact = a.name.toLowerCase() === query;
@@ -118,13 +160,8 @@ function displaySuggestions(results) {
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
         
-        // Secondary sort: prefer entries with both admin1 and country (more specific)
-        const aSpecific = a.admin1 && a.country;
-        const bSpecific = b.admin1 && b.country;
-        if (aSpecific && !bSpecific) return -1;
-        if (!aSpecific && bSpecific) return 1;
-        
-        return 0;
+        // Secondary sort: by population descending (larger cities first)
+        return (b.population || 0) - (a.population || 0);
     });
     
     // Limit to top 8 suggestions
@@ -163,6 +200,7 @@ function displaySuggestions(results) {
             };
             cityInput.value = displayName;
             hideSuggestions();
+            requestAnimationFrame(checkInputOverflow);
             getWeatherBySelectedLocation();
         });
         
@@ -186,7 +224,7 @@ async function getWeather() {
     }
 
     // Show spinner
-    loadingDiv.hidden = false;
+    loadingDiv.classList.add('visible');
     weatherInfo.classList.add('dimmed');
     hideSuggestions();
 
@@ -206,9 +244,14 @@ async function getWeather() {
 
         // If multiple results, show suggestions for user to choose
         if (geoData.results.length > 1) {
-            loadingDiv.hidden = true;
+            loadingDiv.classList.remove('visible');
             weatherInfo.classList.remove('dimmed');
-            displaySuggestions(geoData.results);
+            // Filter to actual populated places (cities/towns) with population data
+            const cityFeatureCodes = ['PPL', 'PPLA', 'PPLA2', 'PPLA3', 'PPLA4', 'PPLC', 'PPLG', 'PPLS'];
+            const cities = geoData.results.filter(city =>
+                cityFeatureCodes.includes(city.feature_code) && city.population > 0
+            );
+            displaySuggestions(cities.length > 0 ? cities : geoData.results);
             showError('Please select a location from the suggestions');
             return;
         }
@@ -235,7 +278,7 @@ async function getWeather() {
             showError(error.message);
         }
     } finally {
-        loadingDiv.hidden = true;
+        loadingDiv.classList.remove('visible');
         weatherInfo.classList.remove('dimmed');
     }
 }
@@ -248,7 +291,7 @@ async function getWeatherBySelectedLocation() {
     }
 
     // Show spinner
-    loadingDiv.hidden = false;
+    loadingDiv.classList.add('visible');
     weatherInfo.classList.add('dimmed');
     hideSuggestions();
 
@@ -275,22 +318,24 @@ async function getWeatherBySelectedLocation() {
             showError(error.message);
         }
     } finally {
-        loadingDiv.hidden = true;
+        loadingDiv.classList.remove('visible');
         weatherInfo.classList.remove('dimmed');
     }
 }
 
 // IP-based geolocation (no browser permission required)
 async function getWeatherByLocation() {
-    // Show loading state - start with hidden spinner
-    loadingDiv.hidden = false;
+    // Show loading state when button is clicked
+    loadingDiv.classList.add('visible');
     weatherInfo.classList.add('dimmed');
     
     cityNameElement.textContent = 'Detecting location...';
-    temperatureElement.textContent = '--°C';
+    temperatureElement.textContent = '--';
     weatherDescriptionElement.textContent = 'Getting your weather data...';
     humidityElement.textContent = '--%';
     windSpeedElement.textContent = '-- km/h';
+    maxTempElement.textContent = '--°';
+    minTempElement.textContent = '--°';
 
     try {
         // Use ip-api.com (no API key required for non-commercial use)
@@ -316,7 +361,7 @@ async function getWeatherByLocation() {
             const weatherData = await weatherResponse.json();
             
             // Hide loading spinner and remove dim
-            loadingDiv.hidden = true;
+            loadingDiv.classList.remove('visible');
             weatherInfo.classList.remove('dimmed');
             
             // Create display name
@@ -332,7 +377,7 @@ async function getWeatherByLocation() {
         console.error('Location error:', error);
         
         // Hide loading spinner and remove dim
-        loadingDiv.hidden = true;
+        loadingDiv.classList.remove('visible');
         weatherInfo.classList.remove('dimmed');
         
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
@@ -344,21 +389,67 @@ async function getWeatherByLocation() {
 }
 
 function displayWeather(data, cityName, country) {
-    const { current } = data;
+    const { current, daily } = data;
     const { temperature_2m: temp, relative_humidity_2m: humidity, wind_speed_10m: windSpeed, weather_code: weatherCode } = current;
 
     // Convert weather code to description and get appropriate icon class
     const weatherDetails = getWeatherInfo(weatherCode);
 
-    // Update the UI elements
+    // Update the primary UI elements
     cityNameElement.textContent = country ? `${cityName}, ${country}` : cityName;
-    temperatureElement.textContent = `${Math.round(temp)}°C`;
+    temperatureElement.textContent = `${Math.round(temp)}`;
     weatherDescriptionElement.textContent = weatherDetails.description;
     humidityElement.textContent = `${humidity}%`;
-    windSpeedElement.textContent = `${Math.round(windSpeed * 3.6)} km/h`; // Convert m/s to km/h
+    windSpeedElement.textContent = `${Math.round(windSpeed * 3.6)} km/h`;
+
+    // Update max/min temps from daily forecast
+    if (daily) {
+        maxTempElement.textContent = `${Math.round(daily.temperature_2m_max[0])}°`;
+        minTempElement.textContent = `${Math.round(daily.temperature_2m_min[0])}°`;
+    }
+
+    // Update time and date
+    const now = new Date();
+    currentTimeElement.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    dateDisplayElement.textContent = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
     // Update the weather icon
     weatherIconElement.className = `wi ${weatherDetails.icon}`;
+
+    // Set the atmospheric background theme
+    setWeatherTheme(weatherCode);
+}
+
+function setWeatherTheme(weatherCode) {
+    // Remove all weather theme classes
+    document.body.classList.remove(
+        'weather-clear', 'weather-cloudy', 'weather-overcast',
+        'weather-rain', 'weather-snow', 'weather-storm',
+        'weather-fog', 'weather-drizzle'
+    );
+
+    // Map weather codes to theme classes
+    if (weatherCode === 0 || weatherCode === 1) {
+        document.body.classList.add('weather-clear');
+    } else if (weatherCode === 2) {
+        document.body.classList.add('weather-cloudy');
+    } else if (weatherCode === 3) {
+        document.body.classList.add('weather-overcast');
+    } else if (weatherCode === 45 || weatherCode === 48) {
+        document.body.classList.add('weather-fog');
+    } else if (weatherCode >= 51 && weatherCode <= 57) {
+        document.body.classList.add('weather-drizzle');
+    } else if (weatherCode >= 61 && weatherCode <= 67) {
+        document.body.classList.add('weather-rain');
+    } else if (weatherCode >= 71 && weatherCode <= 77) {
+        document.body.classList.add('weather-snow');
+    } else if (weatherCode >= 80 && weatherCode <= 82) {
+        document.body.classList.add('weather-rain');
+    } else if (weatherCode >= 85 && weatherCode <= 86) {
+        document.body.classList.add('weather-snow');
+    } else if (weatherCode >= 95) {
+        document.body.classList.add('weather-storm');
+    }
 }
 
 function getWeatherInfo(weatherCode) {
@@ -406,10 +497,14 @@ function getWeatherInfo(weatherCode) {
 
 function showError(message) {
     cityNameElement.textContent = 'Error';
-    temperatureElement.textContent = '--°C';
+    temperatureElement.textContent = '--';
     weatherDescriptionElement.textContent = message;
     humidityElement.textContent = '--%';
     windSpeedElement.textContent = '-- km/h';
+    maxTempElement.textContent = '--°';
+    minTempElement.textContent = '--°';
+    currentTimeElement.textContent = '--:--';
+    dateDisplayElement.textContent = '--';
     weatherIconElement.className = 'wi wi-alert';
 }
 

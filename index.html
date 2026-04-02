@@ -3,34 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Weather App</title>
+    <title>SkyCast - Weather Forecast</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.12/css/weather-icons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <button id="theme-toggle" aria-label="Toggle dark mode"><i class="wi wi-moon-alt"></i></button>
-    <div class="container" role="main">
-        <h1>Weather Forecast</h1>
-        <div class="search-box">
-            <div class="input-wrapper">
-                <input type="text" id="city-input" placeholder="Enter city name..." aria-label="Enter city name" autocomplete="off">
-                <div id="suggestions" class="suggestions-dropdown"></div>
+    <div class="atmosphere">
+        <div class="cloud cloud-1"></div>
+        <div class="cloud cloud-2"></div>
+        <div class="cloud cloud-3"></div>
+    </div>
+
+    <button id="theme-toggle" aria-label="Toggle dark mode">
+        <i class="wi wi-moon-alt"></i>
+    </button>
+
+    <div class="app-wrapper">
+        <header class="app-header">
+            <div class="brand">
+                <i class="wi wi-day-sunny brand-icon"></i>
+                <h1>SkyCast</h1>
             </div>
-            <button id="search-btn" aria-label="Get weather for city">Get Weather</button>
+            <p class="tagline" id="current-date">Your weather companion</p>
+        </header>
+
+        <div class="search-section">
+            <div class="search-card">
+                <div class="input-wrapper">
+                    <i class="wi wi-search search-icon"></i>
+                    <input type="text" id="city-input" placeholder="Search for a city..." aria-label="Enter city name" autocomplete="off">
+                    <div id="suggestions" class="suggestions-dropdown"></div>
+                </div>
+                <button id="location-btn" aria-label="Use my location" class="location-btn">
+                    <i class="wi wi-location-arrow"></i>
+                    <span>Locate Me</span>
+                </button>
+            </div>
         </div>
-        <button id="location-btn" aria-label="Use my location"><i class="wi wi-location-arrow"></i> Use My Location</button>
-        <div id="weather-info" class="weather-info" role="status">
-            <div id="loading" class="loading-spinner" aria-hidden="true" hidden></div>
-            <i class="wi wi-day-sunny weather-icon"></i>
-            <h2 id="city-name">City Name</h2>
-            <p id="temperature">--°C</p>
-            <p id="weather-description">Weather Description</p>
-            <div class="weather-details">
-                <p><strong>Humidity:</strong> <span id="humidity">--%</span></p>
-                <p><strong>Wind:</strong> <span id="wind-speed">-- km/h</span></p>
+
+        <div id="weather-info" class="weather-card" role="status">
+            <div id="loading" class="loading-overlay" aria-hidden="true">
+                <div class="loading-spinner"></div>
+                <p>Fetching weather data...</p>
+            </div>
+
+            <div class="weather-main">
+                <div class="weather-icon-wrap">
+                    <i class="wi wi-day-sunny weather-icon"></i>
+                </div>
+                <div class="weather-primary">
+                    <h2 id="city-name" class="city-name">City Name</h2>
+                    <p id="weather-description" class="weather-desc">Weather Description</p>
+                </div>
+                <div class="temperature-display">
+                    <span id="temperature" class="temp-value">--°</span>
+                    <span class="temp-unit">C</span>
+                </div>
+            </div>
+
+            <div class="weather-meta">
+                <div class="meta-item">
+                    <i class="wi wi-time-4"></i>
+                    <span id="current-time">--:--</span>
+                </div>
+                <div class="meta-divider"></div>
+                <div class="meta-item">
+                    <i class="wi wi-calendar"></i>
+                    <span id="date-display">--</span>
+                </div>
+            </div>
+
+            <div class="weather-details-grid">
+                <div class="detail-card humidity-card">
+                    <div class="detail-icon-wrap">
+                        <i class="wi wi-humidity"></i>
+                    </div>
+                    <div class="detail-info">
+                        <span class="detail-label">Humidity</span>
+                        <span id="humidity" class="detail-value">--%</span>
+                    </div>
+                </div>
+                <div class="detail-card wind-card">
+                    <div class="detail-icon-wrap">
+                        <i class="wi wi-strong-wind"></i>
+                    </div>
+                    <div class="detail-info">
+                        <span class="detail-label">Wind</span>
+                        <span id="wind-speed" class="detail-value">-- km/h</span>
+                    </div>
+                </div>
+                <div class="detail-card maxtemp-card">
+                    <div class="detail-icon-wrap">
+                        <i class="wi wi-direction-up"></i>
+                    </div>
+                    <div class="detail-info">
+                        <span class="detail-label">High</span>
+                        <span id="max-temp" class="detail-value">--°</span>
+                    </div>
+                </div>
+                <div class="detail-card mintemp-card">
+                    <div class="detail-icon-wrap">
+                        <i class="wi wi-direction-down"></i>
+                    </div>
+                    <div class="detail-info">
+                        <span class="detail-label">Low</span>
+                        <span id="min-temp" class="detail-value">--°</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>

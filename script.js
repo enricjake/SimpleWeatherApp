@@ -323,7 +323,75 @@ async function getWeatherBySelectedLocation() {
     }
 }
 
-// IP-based geolocation (no browser permission required)
+// Browser Geolocation API (primary method for mobile devices)
+function getWeatherByBrowserGeolocation() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('Geolocation not supported by browser'));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                });
+            },
+            (error) => {
+                let errorMessage;
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Location permission denied. Please enable location access or search by city name.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Location information unavailable. Please search by city name.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Location request timed out. Please search by city name.';
+                        break;
+                    default:
+                        errorMessage = 'Unable to get location. Please search by city name.';
+                }
+                reject(new Error(errorMessage));
+            },
+            {
+                enableHighAccuracy: false,
+                timeout: 10000,
+                maximumAge: 300000 // 5 minutes cache
+            }
+        );
+    });
+}
+
+// IP-based geolocation (fallback method)
+async function getWeatherByIPGeolocation() {
+    try {
+        // Use ipapi.co as fallback (more mobile-friendly)
+        const ipResponse = await fetch('https://ipapi.co/json/');
+        if (!ipResponse.ok) {
+            throw new Error('Failed to get location from IP');
+        }
+        const ipData = await ipResponse.json();
+        
+        if (ipData.latitude && ipData.longitude) {
+            return {
+                latitude: ipData.latitude,
+                longitude: ipData.longitude,
+                city: ipData.city,
+                region: ipData.region,
+                country: ipData.country_name
+            };
+        } else {
+            throw new Error('Unable to determine location from IP address');
+        }
+    } catch (error) {
+        console.error('IP geolocation error:', error);
+        throw error;
+    }
+}
+
+// Main location function with fallback mechanism
 async function getWeatherByLocation() {
     // Show loading state when button is clicked
     loadingDiv.classList.add('visible');
@@ -338,41 +406,48 @@ async function getWeatherByLocation() {
     minTempElement.textContent = '--°';
 
     try {
-        // Use ip-api.com (no API key required for non-commercial use)
-        const ipResponse = await fetch('https://ipinfo.io/json', { mode: 'cors' });
-        if (!ipResponse.ok) {
-            throw new Error('Failed to get location from IP');
-        }
-        const ipData = await ipResponse.json();
+        let lat, lon, displayName;
         
-        // ipinfo.io returns 'loc' as 'latitude,longitude' and 'region' instead of 'regionName'
-        if (ipData.loc) { // ipinfo.io indicates success by returning location data
-            const [lat, lon] = ipData.loc.split(',');
-            const city = ipData.city;
-            const regionName = ipData.region;
-            const country = ipData.country;
+        // Try browser geolocation first (primary method)
+        try {
+            const coords = await getWeatherByBrowserGeolocation();
+            lat = coords.latitude;
+            lon = coords.longitude;
+            displayName = 'Your Location';
+        } catch (browserError) {
+            console.log('Browser geolocation failed, trying IP-based:', browserError.message);
             
-            // Get weather data using the coordinates
-            const weatherUrl = `${apiUrl}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
-            const weatherResponse = await fetch(weatherUrl);
-            if (!weatherResponse.ok) {
-                throw new Error(`Weather API error: ${weatherResponse.status}`);
+            // Fall back to IP-based geolocation
+            try {
+                const ipData = await getWeatherByIPGeolocation();
+                lat = ipData.latitude;
+                lon = ipData.longitude;
+                
+                // Create display name from IP data
+                let locationParts = [];
+                if (ipData.city) locationParts.push(ipData.city);
+                if (ipData.region) locationParts.push(ipData.region);
+                if (ipData.country) locationParts.push(ipData.country);
+                displayName = locationParts.length > 0 ? locationParts.join(', ') : 'Your Location';
+            } catch (ipError) {
+                // Both methods failed
+                throw new Error(browserError.message.includes('permission') ? browserError.message : 'Unable to determine location. Please search by city name.');
             }
-            const weatherData = await weatherResponse.json();
-            
-            // Hide loading spinner and remove dim
-            loadingDiv.classList.remove('visible');
-            weatherInfo.classList.remove('dimmed');
-            
-            // Create display name
-            let displayName = city ? city : `${lat.toFixed(2)}°N, ${lon.toFixed(2)}°W`;
-            if (regionName) displayName += `, ${regionName}`;
-            if (country) displayName += `, ${country}`;
-            
-            displayWeather(weatherData, displayName, '');
-        } else {
-            throw new Error('Unable to determine location from IP address');
         }
+        
+        // Get weather data using the coordinates
+        const weatherUrl = `${apiUrl}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+        const weatherResponse = await fetch(weatherUrl);
+        if (!weatherResponse.ok) {
+            throw new Error(`Weather API error: ${weatherResponse.status}`);
+        }
+        const weatherData = await weatherResponse.json();
+        
+        // Hide loading spinner and remove dim
+        loadingDiv.classList.remove('visible');
+        weatherInfo.classList.remove('dimmed');
+        
+        displayWeather(weatherData, displayName, '');
     } catch (error) {
         console.error('Location error:', error);
         
@@ -380,11 +455,7 @@ async function getWeatherByLocation() {
         loadingDiv.classList.remove('visible');
         weatherInfo.classList.remove('dimmed');
         
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            showError('Network error. Please check your internet connection.');
-        } else {
-            showError('Unable to determine location. Please search by city name.');
-        }
+        showError(error.message || 'Unable to determine location. Please search by city name.');
     }
 }
 

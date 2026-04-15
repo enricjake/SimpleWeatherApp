@@ -234,7 +234,7 @@ body.dark {
 
 #city-input {
     width: 100%;
-    padding: 12px 14px 12px 40px;
+    padding: 12px 16px 12px 40px;
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -253,16 +253,13 @@ body.dark {
     animation: scroll-text 6s ease-in-out 0.8s infinite;
 }
 
-@keyframes scroll-text {
-    0%, 20% { text-indent: 0; }
-    45%, 55% { text-indent: var(--scroll-dist, 0); }
-    80%, 100% { text-indent: 0; }
-}
-
 .location-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 12px;
     padding: 12px 18px;
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: white;
@@ -270,7 +267,7 @@ body.dark {
     border-radius: var(--radius-sm);
     cursor: pointer;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     white-space: nowrap;
     transition: var(--transition);
@@ -283,11 +280,26 @@ body.dark {
 }
 
 .location-btn:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
 }
 
 .location-btn i {
-    font-size: 14px;
+    font-size: 16px;
+}
+
+body.dark .location-btn {
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    box-shadow: 0 4px 12px rgba(76, 201, 240, 0.3);
+}
+
+body.dark .location-btn:hover {
+    box-shadow: 0 6px 16px rgba(76, 201, 240, 0.4);
+}
+
+@keyframes scroll-text {
+    0%, 20% { text-indent: 0; }
+    45%, 55% { text-indent: var(--scroll-dist, 0); }
+    80%, 100% { text-indent: 0; }
 }
 
 /* ===== Suggestions Dropdown ===== */

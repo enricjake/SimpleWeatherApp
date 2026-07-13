@@ -358,11 +358,13 @@ function displayWeather(data, cityName, country) {
         minTempElement.textContent = `${Math.round(daily.temperature_2m_min[0])}°`;
     }
 
-    const tzOptions = timezone ? { timeZone: timezone } : {};
-    const utcMs = new Date(current.time).getTime() - (data.utc_offset_seconds * 1000);
-    const observationTime = new Date(utcMs);
-    currentTimeElement.textContent = observationTime.toLocaleTimeString([], { ...tzOptions, hour: '2-digit', minute: '2-digit' });
-    dateDisplayElement.textContent = observationTime.toLocaleDateString([], { ...tzOptions, weekday: 'short', month: 'short', day: 'numeric' });
+    const [year, month, day, hour, minute] = current.time.match(/\d+/g).map(Number);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const h12 = hour % 12 || 12;
+    const mm = String(minute).padStart(2, '0');
+    currentTimeElement.textContent = `${h12}:${mm} ${ampm}`;
+    const dateObj = new Date(year, month - 1, day);
+    dateDisplayElement.textContent = dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
     weatherIconElement.className = `wi ${weatherDetails.icon}`;
 

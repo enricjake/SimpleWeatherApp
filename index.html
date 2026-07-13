@@ -33,8 +33,8 @@
             <div class="search-card">
                 <div class="input-wrapper">
                     <i class="wi wi-search search-icon"></i>
-                    <input type="text" id="city-input" placeholder="Search for a city..." aria-label="Enter city name" autocomplete="off">
-                    <div id="suggestions" class="suggestions-dropdown"></div>
+                    <input type="text" id="city-input" placeholder="Search for a city..." aria-label="Enter city name" autocomplete="off" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false">
+                    <div id="suggestions" class="suggestions-dropdown" role="listbox" aria-label="City suggestions"></div>
                 </div>
             </div>
             <button id="location-btn" aria-label="Use my location" class="location-btn">
@@ -43,7 +43,7 @@
             </button>
         </div>
 
-        <div id="weather-info" class="weather-card" role="status">
+        <div id="weather-info" class="weather-card" role="status" aria-live="polite">
             <div id="loading" class="loading-overlay" aria-hidden="true">
                 <div class="loading-spinner"></div>
                 <p>Fetching weather data...</p>

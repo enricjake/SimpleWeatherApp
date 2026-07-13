@@ -359,7 +359,8 @@ function displayWeather(data, cityName, country) {
     }
 
     const tzOptions = timezone ? { timeZone: timezone } : {};
-    const observationTime = new Date(current.time);
+    const utcMs = new Date(current.time).getTime() - (data.utc_offset_seconds * 1000);
+    const observationTime = new Date(utcMs);
     currentTimeElement.textContent = observationTime.toLocaleTimeString([], { ...tzOptions, hour: '2-digit', minute: '2-digit' });
     dateDisplayElement.textContent = observationTime.toLocaleDateString([], { ...tzOptions, weekday: 'short', month: 'short', day: 'numeric' });
 

@@ -691,6 +691,39 @@ body.weather-drizzle {
     background: linear-gradient(160deg, #5f7a9c 0%, #4a6580 50%, #7d97b5 100%);
 }
 
+/* ===== Nighttime overrides (8pm - 6am local time) ===== */
+body.nighttime.weather-clear {
+    background: linear-gradient(160deg, #0c0820 0%, #18103a 50%, #2a1030 100%);
+}
+
+body.nighttime.weather-cloudy {
+    background: linear-gradient(160deg, #141820 0%, #1c2430 50%, #283040 100%);
+}
+
+body.nighttime.weather-overcast {
+    background: linear-gradient(160deg, #10141c 0%, #182030 50%, #222c3c 100%);
+}
+
+body.nighttime.weather-rain {
+    background: linear-gradient(160deg, #0c1220 0%, #14203a 50%, #1c3050 100%);
+}
+
+body.nighttime.weather-snow {
+    background: linear-gradient(160deg, #1e2430 0%, #283040 50%, #343e50 100%);
+}
+
+body.nighttime.weather-storm {
+    background: linear-gradient(160deg, #060610 0%, #0c0c1e 50%, #141430 100%);
+}
+
+body.nighttime.weather-fog {
+    background: linear-gradient(160deg, #20242e 0%, #2a303c 50%, #343c48 100%);
+}
+
+body.nighttime.weather-drizzle {
+    background: linear-gradient(160deg, #161e2e 0%, #1e2a3c 50%, #283648 100%);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 520px) {
     .app-wrapper {

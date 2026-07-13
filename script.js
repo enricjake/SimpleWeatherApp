@@ -342,7 +342,7 @@ async function getWeatherByLocation() {
 }
 
 function displayWeather(data, cityName, country) {
-    const { current, daily } = data;
+    const { current, daily, timezone } = data;
     const { temperature_2m: temp, relative_humidity_2m: humidity, wind_speed_10m: windSpeed, weather_code: weatherCode } = current;
 
     const weatherDetails = getWeatherInfo(weatherCode);
@@ -358,9 +358,10 @@ function displayWeather(data, cityName, country) {
         minTempElement.textContent = `${Math.round(daily.temperature_2m_min[0])}°`;
     }
 
+    const tzOptions = timezone ? { timeZone: timezone } : {};
     const now = new Date();
-    currentTimeElement.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    dateDisplayElement.textContent = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    currentTimeElement.textContent = now.toLocaleTimeString([], { ...tzOptions, hour: '2-digit', minute: '2-digit' });
+    dateDisplayElement.textContent = now.toLocaleDateString([], { ...tzOptions, weekday: 'short', month: 'short', day: 'numeric' });
 
     weatherIconElement.className = `wi ${weatherDetails.icon}`;
 

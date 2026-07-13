@@ -725,6 +725,72 @@ body.dark.weather-drizzle {
     background: linear-gradient(160deg, #141828 0%, #1e2438 50%, #283048 100%);
 }
 
+/* ===== Nighttime overrides (8pm - 6am local time) ===== */
+body.nighttime.weather-clear {
+    background: linear-gradient(160deg, #1a1040 0%, #2d1860 50%, #4a1942 100%);
+}
+
+body.nighttime.weather-cloudy {
+    background: linear-gradient(160deg, #1a1e30 0%, #222c3a 50%, #344150 100%);
+}
+
+body.nighttime.weather-overcast {
+    background: linear-gradient(160deg, #141a24 0%, #1e2838 50%, #2a3548 100%);
+}
+
+body.nighttime.weather-rain {
+    background: linear-gradient(160deg, #101828 0%, #1a2540 50%, #243555 100%);
+}
+
+body.nighttime.weather-snow {
+    background: linear-gradient(160deg, #2a3040 0%, #353c50 50%, #404a60 100%);
+}
+
+body.nighttime.weather-storm {
+    background: linear-gradient(160deg, #0a0a18 0%, #101028 50%, #1a1a38 100%);
+}
+
+body.nighttime.weather-fog {
+    background: linear-gradient(160deg, #282c38 0%, #323846 50%, #3e4450 100%);
+}
+
+body.nighttime.weather-drizzle {
+    background: linear-gradient(160deg, #1e2538 0%, #283048 50%, #343e58 100%);
+}
+
+/* Nighttime + dark mode combined */
+body.dark.nighttime.weather-clear {
+    background: linear-gradient(160deg, #0e0620 0%, #1a0f38 50%, #2a1028 100%);
+}
+
+body.dark.nighttime.weather-cloudy {
+    background: linear-gradient(160deg, #101420 0%, #161e2a 50%, #222c38 100%);
+}
+
+body.dark.nighttime.weather-overcast {
+    background: linear-gradient(160deg, #0a0e18 0%, #121a28 50%, #1a2432 100%);
+}
+
+body.dark.nighttime.weather-rain {
+    background: linear-gradient(160deg, #060a14 0%, #0e1622 50%, #162035 100%);
+}
+
+body.dark.nighttime.weather-snow {
+    background: linear-gradient(160deg, #141820 0%, #1c2230 50%, #242c38 100%);
+}
+
+body.dark.nighttime.weather-storm {
+    background: linear-gradient(160deg, #020208 0%, #060612 50%, #0e0e20 100%);
+}
+
+body.dark.nighttime.weather-fog {
+    background: linear-gradient(160deg, #14161e 0%, #1c2028 50%, #242830 100%);
+}
+
+body.dark.nighttime.weather-drizzle {
+    background: linear-gradient(160deg, #0c1020 0%, #141a2a 50%, #1c2438 100%);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 520px) {
     .app-wrapper {

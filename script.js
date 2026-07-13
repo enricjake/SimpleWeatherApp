@@ -368,15 +368,18 @@ function displayWeather(data, cityName, country) {
 
     weatherIconElement.className = `wi ${weatherDetails.icon}`;
 
-    setWeatherTheme(weatherCode);
+    setWeatherTheme(weatherCode, hour);
 }
 
-function setWeatherTheme(weatherCode) {
+function setWeatherTheme(weatherCode, hour) {
     document.body.classList.remove(
         'weather-clear', 'weather-cloudy', 'weather-overcast',
         'weather-rain', 'weather-snow', 'weather-storm',
         'weather-fog', 'weather-drizzle'
     );
+
+    const isNight = hour >= 20 || hour < 6;
+    document.body.classList.toggle('nighttime', isNight);
 
     if (weatherCode === 0 || weatherCode === 1) {
         document.body.classList.add('weather-clear');

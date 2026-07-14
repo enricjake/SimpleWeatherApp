@@ -96,6 +96,225 @@ body {
     to { transform: translateX(120vw); }
 }
 
+/* ===== Weather Overlay (animated effects) ===== */
+.weather-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.lightning-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+}
+
+/* --- Raindrops (hidden by default) --- */
+.raindrop {
+    position: absolute;
+    top: -60px;
+    width: 1.5px;
+    background: linear-gradient(to bottom, transparent, rgba(174, 194, 224, 0.5));
+    animation: rain-drop linear infinite;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.raindrop::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: -1.5px;
+    width: 4.5px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(174, 194, 224, 0.2);
+}
+
+body.weather-rain .raindrop,
+body.weather-drizzle .raindrop,
+body.weather-storm .raindrop {
+    visibility: visible;
+    opacity: var(--drop-alpha, 0.4);
+}
+
+@keyframes rain-drop {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(105vh); }
+}
+
+/* Drizzle: fewer drops, slower */
+body.weather-drizzle .raindrop:nth-child(n+25) {
+    display: none;
+}
+
+body.weather-drizzle .raindrop {
+    animation-duration: 1.2s !important;
+    animation-delay: 0s !important;
+}
+
+/* Storm: heavier, more visible */
+body.weather-storm .raindrop {
+    background: linear-gradient(to bottom, transparent, rgba(174, 194, 224, 0.7));
+}
+
+body.weather-storm .raindrop::after {
+    background: rgba(174, 194, 224, 0.35);
+}
+
+/* --- Snowflakes (hidden by default) --- */
+.snowflake {
+    position: fixed;
+    top: -5%;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    z-index: 1;
+    animation: snow-shake ease-in-out infinite;
+}
+
+.snowflake .inner {
+    display: block;
+    animation: snow-fall linear infinite;
+}
+
+body.weather-snow .snowflake {
+    visibility: visible;
+    opacity: var(--flake-alpha, 0.6);
+}
+
+@keyframes snow-fall {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(110vh); }
+}
+
+@keyframes snow-shake {
+    0%, 100% { transform: translateX(0); }
+    33% { transform: translateX(40px); }
+    66% { transform: translateX(-20px); }
+}
+
+/* --- Clear: subtle warm shimmer (day) --- */
+body.weather-clear .weather-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 200px 80px at 20% 10%, rgba(255,220,150,0.08) 0%, transparent 100%),
+        radial-gradient(ellipse 180px 70px at 65% 15%, rgba(255,200,120,0.06) 0%, transparent 100%),
+        radial-gradient(ellipse 150px 60px at 40% 25%, rgba(255,210,130,0.04) 0%, transparent 100%);
+    animation: warm-shimmer 6s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes warm-shimmer {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* --- Nighttime clear: stars --- */
+body.nighttime.weather-clear .weather-overlay::before {
+    background:
+        radial-gradient(1.5px 1.5px at 8% 12%, rgba(255,255,255,0.9) 50%, transparent 50%),
+        radial-gradient(2px 2px at 22% 7%, rgba(255,255,255,0.7) 50%, transparent 50%),
+        radial-gradient(1px 1px at 35% 22%, rgba(255,255,255,0.8) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 48% 5%, rgba(255,255,255,0.6) 50%, transparent 50%),
+        radial-gradient(2px 2px at 60% 18%, rgba(255,255,255,0.9) 50%, transparent 50%),
+        radial-gradient(1px 1px at 75% 8%, rgba(255,255,255,0.7) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 88% 20%, rgba(255,255,255,0.8) 50%, transparent 50%),
+        radial-gradient(1px 1px at 15% 35%, rgba(255,255,255,0.6) 50%, transparent 50%),
+        radial-gradient(2px 2px at 42% 30%, rgba(255,255,255,0.7) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 70% 35%, rgba(255,255,255,0.9) 50%, transparent 50%),
+        radial-gradient(1px 1px at 92% 40%, rgba(255,255,255,0.6) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 28% 48%, rgba(255,255,255,0.8) 50%, transparent 50%),
+        radial-gradient(2px 2px at 55% 45%, rgba(255,255,255,0.7) 50%, transparent 50%),
+        radial-gradient(1px 1px at 82% 50%, rgba(255,255,255,0.9) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 10% 55%, rgba(255,255,255,0.6) 50%, transparent 50%),
+        radial-gradient(2px 2px at 45% 55%, rgba(255,255,255,0.8) 50%, transparent 50%),
+        radial-gradient(1px 1px at 65% 58%, rgba(255,255,255,0.7) 50%, transparent 50%),
+        radial-gradient(1.5px 1.5px at 78% 52%, rgba(255,255,255,0.6) 50%, transparent 50%);
+    background-size: 350px 350px;
+    animation: star-twinkle 3s ease-in-out infinite;
+}
+
+@keyframes star-twinkle {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* --- Cloudy: extra drifting soft cloud patches --- */
+body.weather-cloudy .atmosphere::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 320px 70px at 10% 18%, rgba(255,255,255,0.12) 0%, transparent 100%),
+        radial-gradient(ellipse 280px 55px at 55% 45%, rgba(255,255,255,0.1) 0%, transparent 100%),
+        radial-gradient(ellipse 240px 50px at 75% 65%, rgba(255,255,255,0.08) 0%, transparent 100%),
+        radial-gradient(ellipse 200px 40px at 35% 75%, rgba(255,255,255,0.06) 0%, transparent 100%);
+    animation: cloud-drift 60s linear infinite;
+    pointer-events: none;
+}
+
+/* --- Overcast: dense dark veil --- */
+body.weather-overcast .weather-overlay {
+    background: linear-gradient(to bottom,
+        rgba(100, 112, 125, 0.25) 0%,
+        rgba(100, 112, 125, 0.18) 30%,
+        rgba(100, 112, 125, 0.12) 60%,
+        transparent 100%);
+    animation: overcast-pulse 8s ease-in-out infinite;
+}
+
+@keyframes overcast-pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+/* --- Storm: lightning flash --- */
+body.weather-storm .lightning-flash {
+    animation: lightning 8s infinite;
+}
+
+@keyframes lightning {
+    0%, 94%, 96.5%, 100% { opacity: 0; }
+    95% { opacity: 0.9; background: white; }
+    96% { opacity: 0; }
+    98% { opacity: 0.4; background: white; }
+    99% { opacity: 0; }
+}
+
+/* --- Fog: misty overlay with smooth pulse --- */
+body.weather-fog .weather-overlay {
+    background: rgba(180, 195, 210, 0.12);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    animation: fog-pulse 5s ease-in-out infinite;
+}
+
+body.nighttime.weather-fog .weather-overlay {
+    background: rgba(30, 35, 45, 0.2);
+}
+
+@keyframes fog-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.9; }
+}
+
+/* Cloud drift for cloudy sky */
+@keyframes cloud-drift {
+    0% { transform: translateX(-10%); }
+    100% { transform: translateX(110%); }
+}
+
 /* Dark mode atmospheric adjustments */
 body.dark .cloud { background: rgba(255, 255, 255, 0.05); }
 

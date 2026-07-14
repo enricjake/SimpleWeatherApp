@@ -21,6 +21,10 @@ const suggestionsDiv = document.getElementById('suggestions');
 
 let debounceTimer;
 let selectedLocation = null;
+let timeUpdateInterval;
+let currentTimezone;
+let refreshInterval;
+let lastCoords = null;
 
 function checkInputOverflow() {
     if (cityInput.scrollWidth > cityInput.clientWidth) {
@@ -30,6 +34,48 @@ function checkInputOverflow() {
     } else {
         cityInput.classList.remove('overflowing');
         cityInput.style.removeProperty('--scroll-dist');
+    }
+}
+
+function startTimeUpdates(timezone) {
+    clearInterval(timeUpdateInterval);
+    currentTimezone = timezone;
+
+    function updateDisplay() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', {
+            timeZone: currentTimezone,
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+        currentTimeElement.textContent = timeStr;
+
+        const dateStr = now.toLocaleDateString('en-US', {
+            timeZone: currentTimezone,
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
+        dateDisplayElement.textContent = dateStr;
+    }
+
+    updateDisplay();
+    timeUpdateInterval = setInterval(updateDisplay, 10000);
+}
+
+function startAutoRefresh(latitude, longitude, name, country) {
+    clearInterval(refreshInterval);
+    lastCoords = { latitude, longitude, name, country };
+    refreshInterval = setInterval(refreshWeather, 60000);
+}
+
+async function refreshWeather() {
+    if (!lastCoords) return;
+    try {
+        const data = await fetchWeatherData(lastCoords.latitude, lastCoords.longitude);
+        displayWeather(data, lastCoords.name, lastCoords.country, lastCoords.latitude, lastCoords.longitude);
+    } catch (e) {
+        console.warn('Auto-refresh failed, keeping stale data:', e.message);
     }
 }
 
@@ -195,13 +241,25 @@ async function getWeather() {
             hideLoading();
             const cities = filterPopulatedPlaces(geoData.results);
             displaySuggestions(cities.length > 0 ? cities : geoData.results);
-            showError('Please select a location from the suggestions');
             return;
         }
 
         const { latitude, longitude, name, country } = geoData.results[0];
-        const weatherData = await fetchWeatherData(latitude, longitude);
-        displayWeather(weatherData, name, country);
+        await fetchAndDisplay(latitude, longitude, name, country);
+        return;
+    } catch (error) {
+        handleWeatherError(error);
+    } finally {
+        hideLoading();
+    }
+}
+
+async function fetchAndDisplay(latitude, longitude, name, country) {
+    showLoading();
+    hideSuggestions();
+    try {
+        const data = await fetchWeatherData(latitude, longitude);
+        displayWeather(data, name, country, latitude, longitude);
     } catch (error) {
         handleWeatherError(error);
     } finally {
@@ -214,19 +272,12 @@ async function getWeatherBySelectedLocation() {
         showError('Please select a location from the suggestions');
         return;
     }
-
-    showLoading();
-    hideSuggestions();
-
-    try {
-        const { latitude, longitude, name, country } = selectedLocation;
-        const weatherData = await fetchWeatherData(latitude, longitude);
-        displayWeather(weatherData, name, country);
-    } catch (error) {
-        handleWeatherError(error);
-    } finally {
-        hideLoading();
-    }
+    await fetchAndDisplay(
+        selectedLocation.latitude,
+        selectedLocation.longitude,
+        selectedLocation.name,
+        selectedLocation.country
+    );
 }
 
 function getWeatherByBrowserGeolocation() {
@@ -333,7 +384,7 @@ async function getWeatherByLocation() {
 
         const weatherData = await fetchWeatherData(lat, lon);
         hideLoading();
-        displayWeather(weatherData, displayName, '');
+        displayWeather(weatherData, displayName, '', lat, lon);
     } catch (error) {
         console.error('Location error:', error);
         hideLoading();
@@ -341,7 +392,7 @@ async function getWeatherByLocation() {
     }
 }
 
-function displayWeather(data, cityName, country) {
+function displayWeather(data, cityName, country, latitude, longitude) {
     const { current, daily, timezone } = data;
     const { temperature_2m: temp, relative_humidity_2m: humidity, wind_speed_10m: windSpeed, weather_code: weatherCode } = current;
 
@@ -351,23 +402,19 @@ function displayWeather(data, cityName, country) {
     temperatureElement.textContent = `${Math.round(temp)}`;
     weatherDescriptionElement.textContent = weatherDetails.description;
     humidityElement.textContent = `${humidity}%`;
-    windSpeedElement.textContent = `${Math.round(windSpeed * 3.6)} km/h`;
+    windSpeedElement.textContent = `${Math.round(windSpeed)} km/h`;
 
     if (daily) {
         maxTempElement.textContent = `${Math.round(daily.temperature_2m_max[0])}°`;
         minTempElement.textContent = `${Math.round(daily.temperature_2m_min[0])}°`;
     }
 
-    const [year, month, day, hour, minute] = current.time.match(/\d+/g).map(Number);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const h12 = hour % 12 || 12;
-    const mm = String(minute).padStart(2, '0');
-    currentTimeElement.textContent = `${h12}:${mm} ${ampm}`;
-    const dateObj = new Date(year, month - 1, day);
-    dateDisplayElement.textContent = dateObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    startTimeUpdates(timezone);
+    startAutoRefresh(latitude, longitude, cityName, country);
 
     weatherIconElement.className = `wi ${weatherDetails.icon}`;
 
+    const hour = parseInt(current.time.split('T')[1].split(':')[0], 10);
     setWeatherTheme(weatherCode, hour);
 }
 
@@ -440,6 +487,10 @@ function getWeatherInfo(weatherCode) {
 }
 
 function showError(message) {
+    clearInterval(refreshInterval);
+    clearInterval(timeUpdateInterval);
+    currentTimezone = null;
+    lastCoords = null;
     cityNameElement.textContent = 'Error';
     temperatureElement.textContent = '--';
     weatherDescriptionElement.textContent = message;
@@ -525,3 +576,42 @@ locationBtn.addEventListener('click', function() {
 });
 
 themeToggle.addEventListener('click', toggleDarkMode);
+
+// --- Weather particle effects generation ---
+(function initWeatherParticles() {
+    const overlay = document.querySelector('.weather-overlay');
+    if (!overlay) return;
+
+    // Raindrops (opacity via --drop-alpha to avoid inline-style override)
+    for (let i = 0; i < 50; i++) {
+        const drop = document.createElement('i');
+        drop.className = 'raindrop';
+        drop.style.left = Math.random() * 100 + '%';
+        drop.style.animationDuration = (0.3 + Math.random() * 0.5) + 's';
+        drop.style.animationDelay = Math.random() * 3 + 's';
+        drop.style.height = (30 + Math.random() * 50) + 'px';
+        drop.style.setProperty('--drop-alpha', 0.2 + Math.random() * 0.3);
+        overlay.appendChild(drop);
+    }
+
+    // Snowflakes (opacity via --flake-alpha)
+    const snowChars = ['❅', '❆', '❄'];
+    for (let i = 0; i < 24; i++) {
+        const flake = document.createElement('div');
+        flake.className = 'snowflake';
+        const inner = document.createElement('div');
+        inner.className = 'inner';
+        inner.textContent = snowChars[i % snowChars.length];
+        flake.appendChild(inner);
+        flake.style.left = Math.random() * 100 + '%';
+        flake.style.fontSize = (10 + Math.random() * 20) + 'px';
+        flake.style.setProperty('--flake-alpha', 0.3 + Math.random() * 0.5);
+        const fallDuration = 8 + Math.random() * 12;
+        const shakeDuration = 2 + Math.random() * 3;
+        inner.style.animationDuration = fallDuration + 's';
+        inner.style.animationDelay = Math.random() * fallDuration + 's';
+        flake.style.animationDuration = shakeDuration + 's';
+        flake.style.animationDelay = Math.random() * 5 + 's';
+        overlay.appendChild(flake);
+    }
+})();

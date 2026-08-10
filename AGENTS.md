@@ -35,9 +35,12 @@ npx serve .
 - Dark mode: `body.dark` class, persisted to `localStorage` key `skycast-dark-mode`
 - Metric-only (Celsius, km/h) — Imperial listed as planned in `REQUIREMENTS.md` but not implemented
 
+## MCP Usage
+
+- Use MCPs as much as possible, when necessary.
+
 ## Gotchas
 
-- **Wind speed bug**: Open-Meteo returns `wind_speed_10m` in km/h, but `script.js` applies `* 3.6` (treating it as m/s). The displayed speed is ~3.6× the actual value.
 - `selectedLocation` state tracks the last picked suggestion; cleared when the input text changes away from the selected display name
 - Autocomplete requests `count=50` results, deduplicates by name+admin1+country, sorts exact matches first then by population descending, and shows at most 8
 - Shared helpers: `showLoading()`/`hideLoading()`, `fetchWeatherData()`, `handleWeatherError()`, `filterPopulatedPlaces()`, `startTimeUpdates()`

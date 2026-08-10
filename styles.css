@@ -557,6 +557,14 @@ body.dark .location-btn:hover {
     background-color: rgba(67, 97, 238, 0.1);
 }
 
+.suggestion-item.active {
+    background-color: rgba(67, 97, 238, 0.12);
+}
+
+body.dark .suggestion-item.active {
+    background-color: rgba(76, 201, 240, 0.14);
+}
+
 body.dark .suggestion-item {
     border-bottom-color: rgba(255, 255, 255, 0.06);
 }

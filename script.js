@@ -25,6 +25,8 @@ let timeUpdateInterval;
 let currentTimezone;
 let refreshInterval;
 let lastCoords = null;
+let suggestionsController = null;
+let activeSuggestionIndex = -1;
 
 function checkInputOverflow() {
     if (cityInput.scrollWidth > cityInput.clientWidth) {
@@ -120,8 +122,14 @@ function handleWeatherError(error) {
 }
 
 async function fetchCitySuggestions(query) {
+    if (suggestionsController) {
+        suggestionsController.abort();
+    }
+    suggestionsController = new AbortController();
     try {
-        const response = await fetch(`${geocodingUrl}?name=${query}&count=50&language=en&format=json`);
+        const response = await fetch(`${geocodingUrl}?name=${query}&count=50&language=en&format=json`, {
+            signal: suggestionsController.signal
+        });
         if (!response.ok) {
             throw new Error(`Geocoding API error: ${response.status}`);
         }
@@ -138,6 +146,7 @@ async function fetchCitySuggestions(query) {
             hideSuggestions();
         }
     } catch (error) {
+        if (error.name === 'AbortError') return;
         console.error('Error fetching city suggestions:', error);
         hideSuggestions();
     }
@@ -167,6 +176,8 @@ function displaySuggestions(results) {
     });
 
     const topSuggestions = uniqueResults.slice(0, 8);
+    activeSuggestionIndex = -1;
+    suggestionsDiv.removeAttribute('aria-activedescendant');
 
     topSuggestions.forEach((city, index) => {
         const suggestionItem = document.createElement('div');
@@ -179,27 +190,19 @@ function displaySuggestions(results) {
         if (city.country) locationParts.push(city.country);
 
         const displayName = locationParts.join(', ');
-        const fullName = city.country ? `${city.name}, ${city.country}` : city.name;
 
-        suggestionItem.innerHTML = `
-            <span class="city-name">${city.name}</span>
-            <span class="location-detail">${city.admin1 ? city.admin1 + ', ' : ''}${city.country || ''}</span>
-        `;
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'city-name';
+        nameSpan.textContent = city.name;
 
-        suggestionItem.addEventListener('click', () => {
-            selectedLocation = {
-                latitude: city.latitude,
-                longitude: city.longitude,
-                name: city.name,
-                country: city.country,
-                admin1: city.admin1,
-                displayName: fullName
-            };
-            cityInput.value = displayName;
-            hideSuggestions();
-            requestAnimationFrame(checkInputOverflow);
-            getWeatherBySelectedLocation();
-        });
+        const detailSpan = document.createElement('span');
+        detailSpan.className = 'location-detail';
+        detailSpan.textContent = `${city.admin1 ? city.admin1 + ', ' : ''}${city.country || ''}`;
+
+        suggestionItem.appendChild(nameSpan);
+        suggestionItem.appendChild(detailSpan);
+
+        suggestionItem.addEventListener('click', () => selectSuggestion(city, displayName));
 
         suggestionsDiv.appendChild(suggestionItem);
     });
@@ -208,10 +211,27 @@ function displaySuggestions(results) {
     cityInput.setAttribute('aria-expanded', 'true');
 }
 
+function selectSuggestion(city, displayName) {
+    selectedLocation = {
+        latitude: city.latitude,
+        longitude: city.longitude,
+        name: city.name,
+        country: city.country,
+        admin1: city.admin1,
+        displayName: displayName
+    };
+    cityInput.value = displayName;
+    hideSuggestions();
+    requestAnimationFrame(checkInputOverflow);
+    getWeatherBySelectedLocation();
+}
+
 function hideSuggestions() {
     suggestionsDiv.classList.remove('active');
     suggestionsDiv.innerHTML = '';
+    suggestionsDiv.removeAttribute('aria-activedescendant');
     cityInput.setAttribute('aria-expanded', 'false');
+    activeSuggestionIndex = -1;
 }
 
 async function getWeather() {
@@ -321,8 +341,10 @@ function getWeatherByBrowserGeolocation() {
 }
 
 async function getWeatherByIPGeolocation() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-        const ipResponse = await fetch('https://ipapi.co/json/');
+        const ipResponse = await fetch('https://ipapi.co/json/', { signal: controller.signal });
         if (!ipResponse.ok) {
             throw new Error('Failed to get location from IP');
         }
@@ -342,19 +364,30 @@ async function getWeatherByIPGeolocation() {
     } catch (error) {
         console.error('IP geolocation error:', error);
         throw error;
+    } finally {
+        clearTimeout(timeout);
     }
+}
+
+function resetWeatherFields() {
+    cityNameElement.textContent = 'City Name';
+    temperatureElement.textContent = '--°';
+    weatherDescriptionElement.textContent = 'Weather Description';
+    humidityElement.textContent = '--%';
+    windSpeedElement.textContent = '-- km/h';
+    maxTempElement.textContent = '--°';
+    minTempElement.textContent = '--°';
+    currentTimeElement.textContent = '--:--';
+    dateDisplayElement.textContent = '--';
+    weatherIconElement.className = 'wi wi-day-sunny weather-icon';
 }
 
 async function getWeatherByLocation() {
     showLoading();
 
+    resetWeatherFields();
     cityNameElement.textContent = 'Detecting location...';
-    temperatureElement.textContent = '--';
     weatherDescriptionElement.textContent = 'Getting your weather data...';
-    humidityElement.textContent = '--%';
-    windSpeedElement.textContent = '-- km/h';
-    maxTempElement.textContent = '--°';
-    minTempElement.textContent = '--°';
 
     try {
         let lat, lon, displayName;
@@ -394,6 +427,10 @@ async function getWeatherByLocation() {
 
 function displayWeather(data, cityName, country, latitude, longitude) {
     const { current, daily, timezone } = data;
+    if (!current) {
+        showError('Unexpected weather data received');
+        return;
+    }
     const { temperature_2m: temp, relative_humidity_2m: humidity, wind_speed_10m: windSpeed, weather_code: weatherCode } = current;
 
     const weatherDetails = getWeatherInfo(weatherCode);
@@ -404,7 +441,7 @@ function displayWeather(data, cityName, country, latitude, longitude) {
     humidityElement.textContent = `${humidity}%`;
     windSpeedElement.textContent = `${Math.round(windSpeed)} km/h`;
 
-    if (daily) {
+    if (daily && daily.temperature_2m_max && daily.temperature_2m_max.length) {
         maxTempElement.textContent = `${Math.round(daily.temperature_2m_max[0])}°`;
         minTempElement.textContent = `${Math.round(daily.temperature_2m_min[0])}°`;
     }
@@ -412,20 +449,25 @@ function displayWeather(data, cityName, country, latitude, longitude) {
     startTimeUpdates(timezone);
     startAutoRefresh(latitude, longitude, cityName, country);
 
-    weatherIconElement.className = `wi ${weatherDetails.icon}`;
+    const hour = Number((current.time && current.time.split('T')[1] || '0').split(':')[0]) || 0;
+    const isNight = hour >= 20 || hour < 6;
 
-    const hour = parseInt(current.time.split('T')[1].split(':')[0], 10);
-    setWeatherTheme(weatherCode, hour);
+    let icon = weatherDetails.icon;
+    if (isNight && icon.indexOf('wi-day-') === 0) {
+        icon = icon.replace('wi-day-', 'wi-night-');
+    }
+    weatherIconElement.className = `wi ${icon}`;
+
+    setWeatherTheme(weatherCode, hour, isNight);
 }
 
-function setWeatherTheme(weatherCode, hour) {
+function setWeatherTheme(weatherCode, hour, isNight) {
     document.body.classList.remove(
         'weather-clear', 'weather-cloudy', 'weather-overcast',
         'weather-rain', 'weather-snow', 'weather-storm',
         'weather-fog', 'weather-drizzle'
     );
 
-    const isNight = hour >= 20 || hour < 6;
     document.body.classList.toggle('nighttime', isNight);
 
     if (weatherCode === 0 || weatherCode === 1) {
@@ -491,15 +533,9 @@ function showError(message) {
     clearInterval(timeUpdateInterval);
     currentTimezone = null;
     lastCoords = null;
+    resetWeatherFields();
     cityNameElement.textContent = 'Error';
-    temperatureElement.textContent = '--';
     weatherDescriptionElement.textContent = message;
-    humidityElement.textContent = '--%';
-    windSpeedElement.textContent = '-- km/h';
-    maxTempElement.textContent = '--°';
-    minTempElement.textContent = '--°';
-    currentTimeElement.textContent = '--:--';
-    dateDisplayElement.textContent = '--';
     weatherIconElement.className = 'wi wi-alert';
 }
 
@@ -522,16 +558,46 @@ function toggleDarkMode() {
 const savedDarkMode = localStorage.getItem('skycast-dark-mode');
 if (savedDarkMode === 'true') {
     applyDarkMode(true);
+} else if (savedDarkMode === 'false') {
+    applyDarkMode(false);
+} else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    applyDarkMode(true);
 }
 
-cityInput.addEventListener('keypress', function(e) {
+cityInput.addEventListener('keydown', function(e) {
+    const items = Array.from(suggestionsDiv.querySelectorAll('.suggestion-item'));
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (items.length === 0) return;
+        e.preventDefault();
+        if (e.key === 'ArrowDown') {
+            activeSuggestionIndex = (activeSuggestionIndex + 1) % items.length;
+        } else {
+            activeSuggestionIndex = (activeSuggestionIndex - 1 + items.length) % items.length;
+        }
+        items.forEach((el, i) => el.classList.toggle('active', i === activeSuggestionIndex));
+        suggestionsDiv.setAttribute('aria-activedescendant', `suggestion-${activeSuggestionIndex}`);
+        cityInput.setAttribute('aria-expanded', 'true');
+        return;
+    }
+
     if (e.key === 'Enter') {
+        if (activeSuggestionIndex >= 0 && items[activeSuggestionIndex]) {
+            e.preventDefault();
+            items[activeSuggestionIndex].click();
+            return;
+        }
         hideSuggestions();
         if (selectedLocation) {
             getWeatherBySelectedLocation();
         } else {
             getWeather();
         }
+        return;
+    }
+
+    if (e.key === 'Escape') {
+        hideSuggestions();
     }
 });
 
